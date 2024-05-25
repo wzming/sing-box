@@ -65,6 +65,7 @@ func (r DNSRule) IsValid() bool {
 }
 
 type _DefaultDNSRule struct {
+	Tag                      string                 `json:"tag,omitempty"`
 	Inbound                  Listable[string]       `json:"inbound,omitempty"`
 	IPVersion                int                    `json:"ip_version,omitempty"`
 	QueryType                Listable[DNSQueryType] `json:"query_type,omitempty"`
@@ -135,6 +136,7 @@ func (r *DefaultDNSRule) IsValid() bool {
 }
 
 type LogicalDNSRule struct {
+	Tag          string      `json:"tag,omitempty"`
 	Mode         string      `json:"mode"`
 	Rules        []DNSRule   `json:"rules,omitempty"`
 	Invert       bool        `json:"invert,omitempty"`
