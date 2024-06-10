@@ -846,6 +846,7 @@ func (r *Router) RouteConnection(ctx context.Context, conn net.Conn, metadata ad
 		}
 		metadata.FakeIP = true
 		r.logger.DebugContext(ctx, "found fakeip domain: ", domain)
+		r.logger.DebugContext(ctx, "connection destination is overridden as ", domain, ":", metadata.Destination.Port)
 	}
 
 	if deadline.NeedAdditionalReadDeadline(conn) {
@@ -866,16 +867,17 @@ func (r *Router) RouteConnection(ctx context.Context, conn net.Conn, metadata ad
 			sniff.BitTorrent,
 		)
 		if err == nil {
+			if metadata.Domain != "" {
+				r.logger.DebugContext(ctx, "sniffed protocol: ", metadata.Protocol, ", domain: ", metadata.Domain)
+			} else {
+				r.logger.DebugContext(ctx, "sniffed protocol: ", metadata.Protocol)
+			}
 			if metadata.InboundOptions.SniffOverrideDestination && M.IsDomainName(metadata.Domain) {
 				metadata.Destination = M.Socksaddr{
 					Fqdn: metadata.Domain,
 					Port: metadata.Destination.Port,
 				}
-			}
-			if metadata.Domain != "" {
-				r.logger.DebugContext(ctx, "sniffed protocol: ", metadata.Protocol, ", domain: ", metadata.Domain)
-			} else {
-				r.logger.DebugContext(ctx, "sniffed protocol: ", metadata.Protocol)
+				r.logger.DebugContext(ctx, "connection destination is overridden as ", metadata.Domain, ":", metadata.Destination.Port)
 			}
 		}
 		if !buffer.IsEmpty() {
@@ -969,6 +971,7 @@ func (r *Router) RoutePacketConnection(ctx context.Context, conn N.PacketConn, m
 		}
 		metadata.FakeIP = true
 		r.logger.DebugContext(ctx, "found fakeip domain: ", domain)
+		r.logger.DebugContext(ctx, "packet destination is overridden as ", domain, ":", metadata.Destination.Port)
 	}
 
 	// Currently we don't have deadline usages for UDP connections
@@ -1015,12 +1018,6 @@ func (r *Router) RoutePacketConnection(ctx context.Context, conn N.PacketConn, m
 					continue
 				}
 				if metadata.Protocol != "" {
-					if metadata.InboundOptions.SniffOverrideDestination && M.IsDomainName(metadata.Domain) {
-						metadata.Destination = M.Socksaddr{
-							Fqdn: metadata.Domain,
-							Port: metadata.Destination.Port,
-						}
-					}
 					if metadata.Domain != "" && metadata.Client != "" {
 						r.logger.DebugContext(ctx, "sniffed packet protocol: ", metadata.Protocol, ", domain: ", metadata.Domain, ", client: ", metadata.Client)
 					} else if metadata.Domain != "" {
@@ -1029,6 +1026,13 @@ func (r *Router) RoutePacketConnection(ctx context.Context, conn N.PacketConn, m
 						r.logger.DebugContext(ctx, "sniffed packet protocol: ", metadata.Protocol, ", client: ", metadata.Client)
 					} else {
 						r.logger.DebugContext(ctx, "sniffed packet protocol: ", metadata.Protocol)
+					}
+					if metadata.InboundOptions.SniffOverrideDestination && M.IsDomainName(metadata.Domain) {
+						metadata.Destination = M.Socksaddr{
+							Fqdn: metadata.Domain,
+							Port: metadata.Destination.Port,
+						}
+						r.logger.DebugContext(ctx, "connection destination is overridden as ", metadata.Domain, ":", metadata.Destination.Port)
 					}
 				}
 			}
