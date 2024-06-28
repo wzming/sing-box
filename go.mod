@@ -61,6 +61,8 @@ require (
 
 replace github.com/sagernet/sing-dns v0.3.0-beta.14 => github.com/puernya/sing-dns v0.0.0-20240813092929-71c0b35e0dd7
 
+replace github.com/sagernet/sing v0.5.0-alpha.15 => github.com/puernya/sing v0.0.0-20240813154729-c5028d939871
+
 require (
 	github.com/Dreamacro/protobytes v0.0.0-20230617041236-6500a9f4f158 // indirect
 	github.com/ajg/form v1.5.1 // indirect
