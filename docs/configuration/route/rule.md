@@ -127,6 +127,7 @@ icon: material/alert-decagram
         // deprecated
         "rule_set_ipcidr_match_source": false,
         "rule_set_ip_cidr_match_source": false,
+        "fake_ip": false,
         "invert": false,
         "skip_resolve": false,
         "outbound": "direct"
@@ -347,6 +348,10 @@ Make `ip_cidr` in rule-sets match the source IP.
 !!! question "Since sing-box 1.10.0"
 
 Make `ip_cidr` in rule-sets match the source IP.
+
+#### fake_ip
+
+Match FakeIP origin destination.
 
 #### invert
 

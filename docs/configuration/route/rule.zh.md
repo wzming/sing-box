@@ -125,6 +125,7 @@ icon: material/alert-decagram
         // 已弃用
         "rule_set_ipcidr_match_source": false,
         "rule_set_ip_cidr_match_source": false,
+        "fake_ip": false,
         "invert": false,
         "skip_resolve": false,
         "outbound": "direct"
@@ -345,6 +346,10 @@ icon: material/alert-decagram
 !!! question "自 sing-box 1.10.0 起"
 
 使规则集中的 `ip_cidr` 规则匹配源 IP。
+
+#### fake_ip
+
+匹配入站为 FakeIP 的情况
 
 #### invert
 
