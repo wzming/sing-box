@@ -59,8 +59,8 @@ func (r *Router) matchDNS(ctx context.Context, allowFakeIP bool, index int, isAd
 					r.dnsLogger.ErrorContext(ctx, "transport not found: ", detour)
 					continue
 				}
-				_, isFakeIP := transport.(adapter.FakeIPTransport)
-				if isFakeIP && !allowFakeIP {
+				fakeIPTransport, isFakeIP := transport.(adapter.FakeIPTransport)
+				if isFakeIP && (!allowFakeIP || (fakeIPTransport.Store() != nil && fakeIPTransport.Store().ExcludeRule() != nil && fakeIPTransport.Store().ExcludeRule().Match(&adapter.InboundContext{Domain: metadata.Domain, FakeIPFilter: true}))) {
 					continue
 				}
 				ruleIndex := currentRuleIndex
@@ -96,7 +96,7 @@ func (r *Router) matchDNS(ctx context.Context, allowFakeIP bool, index int, isAd
 	}
 }
 
-func (r *Router) matchFallbackRules(ctx context.Context, addrs []netip.Addr, rules []adapter.FallbackRule, allowFakeIP bool) (context.Context, dns.Transport, dns.DomainStrategy, adapter.FallbackRule, bool) {
+func (r *Router) matchFallbackRules(ctx context.Context, domain string, addrs []netip.Addr, rules []adapter.FallbackRule, allowFakeIP bool) (context.Context, dns.Transport, dns.DomainStrategy, adapter.FallbackRule, bool) {
 	metadata := &adapter.InboundContext{DestinationAddresses: addrs, DnsFallBack: true}
 	for _, rule := range rules {
 		metadata.ResetRuleCache()
@@ -116,8 +116,9 @@ func (r *Router) matchFallbackRules(ctx context.Context, addrs []netip.Addr, rul
 					r.dnsLogger.ErrorContext(ctx, "transport not found: ", detour)
 					continue
 				}
-				_, isFakeIP = transport.(adapter.FakeIPTransport)
-				if isFakeIP && !allowFakeIP {
+				var fakeIPTransport adapter.FakeIPTransport
+				fakeIPTransport, isFakeIP = transport.(adapter.FakeIPTransport)
+				if isFakeIP && (!allowFakeIP || (fakeIPTransport.Store() != nil && fakeIPTransport.Store().ExcludeRule() != nil && fakeIPTransport.Store().ExcludeRule().Match(&adapter.InboundContext{Domain: domain, FakeIPFilter: true}))) {
 					continue
 				}
 			}
@@ -303,7 +304,7 @@ func (r *Router) exchangeFunc(ctx context.Context, message *mDNS.Msg, isCacheUpd
 			break
 		}
 		var fallbackRule adapter.FallbackRule
-		dnsCtx, transport, strategy, fallbackRule, isFakeIP = r.matchFallbackRules(ctx, addrs, fbRules, true)
+		dnsCtx, transport, strategy, fallbackRule, isFakeIP = r.matchFallbackRules(ctx, metadata.Domain, addrs, fbRules, true)
 		dnsCtx = adapter.OverrideContext(dnsCtx)
 		if fallbackRule == nil {
 			break
@@ -433,7 +434,7 @@ func (r *Router) lookupFunc(ctx context.Context, domain string, strategy dns.Dom
 			break
 		}
 		var fallbackRule adapter.FallbackRule
-		dnsCtx, transport, strategy, fallbackRule, _ = r.matchFallbackRules(ctx, responseAddrs, fbRules, false)
+		dnsCtx, transport, strategy, fallbackRule, _ = r.matchFallbackRules(ctx, metadata.Domain, responseAddrs, fbRules, false)
 		dnsCtx = adapter.OverrideContext(dnsCtx)
 		if fallbackRule == nil {
 			break
