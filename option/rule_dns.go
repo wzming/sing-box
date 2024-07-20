@@ -127,6 +127,7 @@ type _DefaultDNSRule struct {
 	RuleSetIPCIDRAcceptEmpty bool                   `json:"rule_set_ip_cidr_accept_empty,omitempty"`
 	Invert                   bool                   `json:"invert,omitempty"`
 	Server                   string                 `json:"server,omitempty"`
+	AllowFallthrough         bool                   `json:"allow_fallthrough,omitempty"`
 	DisableCache             bool                   `json:"disable_cache,omitempty"`
 	RewriteTTL               *uint32                `json:"rewrite_ttl,omitempty"`
 	ClientSubnet             *AddrPrefix            `json:"client_subnet,omitempty"`
@@ -155,6 +156,7 @@ func (r *DefaultDNSRule) IsValid() bool {
 	var defaultValue DefaultDNSRule
 	defaultValue.Invert = r.Invert
 	defaultValue.Server = r.Server
+	defaultValue.AllowFallthrough = r.AllowFallthrough
 	defaultValue.DisableCache = r.DisableCache
 	defaultValue.RewriteTTL = r.RewriteTTL
 	defaultValue.ClientSubnet = r.ClientSubnet
@@ -162,14 +164,15 @@ func (r *DefaultDNSRule) IsValid() bool {
 }
 
 type LogicalDNSRule struct {
-	Tag          string      `json:"tag,omitempty"`
-	Mode         string      `json:"mode"`
-	Rules        []DNSRule   `json:"rules,omitempty"`
-	Invert       bool        `json:"invert,omitempty"`
-	Server       string      `json:"server,omitempty"`
-	DisableCache bool        `json:"disable_cache,omitempty"`
-	RewriteTTL   *uint32     `json:"rewrite_ttl,omitempty"`
-	ClientSubnet *AddrPrefix `json:"client_subnet,omitempty"`
+	Tag              string      `json:"tag,omitempty"`
+	Mode             string      `json:"mode"`
+	Rules            []DNSRule   `json:"rules,omitempty"`
+	Invert           bool        `json:"invert,omitempty"`
+	Server           string      `json:"server,omitempty"`
+	AllowFallthrough bool        `json:"allow_fallthrough,omitempty"`
+	DisableCache     bool        `json:"disable_cache,omitempty"`
+	RewriteTTL       *uint32     `json:"rewrite_ttl,omitempty"`
+	ClientSubnet     *AddrPrefix `json:"client_subnet,omitempty"`
 }
 
 func (r LogicalDNSRule) IsValid() bool {

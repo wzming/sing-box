@@ -133,6 +133,7 @@ icon: material/new-box
         ],
         "fallback_rules": [],
         "server": "local",
+        "allow_fallthrough": false,
         "disable_cache": false,
         "rewrite_ttl": 100,
         "client_subnet": "127.0.0.1/24"
@@ -143,6 +144,7 @@ icon: material/new-box
         "rules": [],
         "fallback_rules": [],
         "server": "local",
+        "allow_fallthrough": false,
         "disable_cache": false,
         "rewrite_ttl": 100,
         "client_subnet": "127.0.0.1/24"
@@ -359,6 +361,10 @@ Server will be used to afford response if set.
 ==Required==
 
 Tag of the target dns server.
+
+#### allow_fallthrough
+
+Allow fallthrough when there's no IP record in dns answers when query type is A/AAAA or inner lookup.
 
 #### disable_cache
 
