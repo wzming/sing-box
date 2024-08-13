@@ -124,6 +124,7 @@ icon: material/alert-decagram
         "rule_set_ipcidr_match_source": false,
         "rule_set_ip_cidr_match_source": false,
         "invert": false,
+        "skip_resolve": false,
         "outbound": "direct"
       },
       {
@@ -131,6 +132,7 @@ icon: material/alert-decagram
         "mode": "and",
         "rules": [],
         "invert": false,
+        "skip_resolve": false,
         "outbound": "direct"
       }
     ]
@@ -345,6 +347,10 @@ icon: material/alert-decagram
 #### invert
 
 反选匹配结果。
+
+#### skip_resolve
+
+跳过域名解析。
 
 #### outbound
 
