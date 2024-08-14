@@ -63,7 +63,7 @@ replace github.com/sagernet/sing-dns v0.3.0-beta.14 => github.com/puernya/sing-d
 
 replace github.com/sagernet/sing v0.5.0-alpha.15 => github.com/puernya/sing v0.0.0-20240813154738-7869f22b3a64
 
-replace github.com/sagernet/sing-tun v0.4.0-beta.13.0.20240703164908-1f043289199d => github.com/puernya/sing-tun v0.0.0-20240813160104-314682f02ee5
+replace github.com/sagernet/sing-tun v0.4.0-beta.13.0.20240703164908-1f043289199d => github.com/puernya/sing-tun v0.0.0-20240814031813-21dee280e97a
 
 require (
 	github.com/Dreamacro/protobytes v0.0.0-20230617041236-6500a9f4f158 // indirect
