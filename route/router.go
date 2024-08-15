@@ -170,6 +170,7 @@ func NewRouter(
 		DisableCache:     dnsOptions.DNSClientOptions.DisableCache,
 		DisableExpire:    dnsOptions.DNSClientOptions.DisableExpire,
 		IndependentCache: dnsOptions.DNSClientOptions.IndependentCache,
+		LazyCache:        dnsOptions.DNSClientOptions.LazyCache,
 		Hosts:            dnsHosts,
 		RDRC: func() dns.RDRCStore {
 			cacheFile := service.FromContext[adapter.CacheFile](ctx)

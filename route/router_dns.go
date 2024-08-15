@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/sagernet/sing-box/adapter"
+	"github.com/sagernet/sing-box/log"
 	"github.com/sagernet/sing-dns"
 	"github.com/sagernet/sing/common/cache"
 	E "github.com/sagernet/sing/common/exceptions"
@@ -146,6 +147,11 @@ func (r *Router) matchFallbackRules(ctx context.Context, addrs []netip.Addr, rul
 	return ctx, nil, dns.DomainStrategyAsIS, nil, false
 }
 
+func createUpdateCacheContext(ctx context.Context) context.Context {
+	result := log.ContextWithNewID(context.Background())
+	return adapter.WithContext(result, adapter.ContextFrom(ctx))
+}
+
 func (r *Router) Exchange(ctx context.Context, message *mDNS.Msg) (*mDNS.Msg, error) {
 	var rawFqdn string
 	if len(message.Question) > 0 {
@@ -153,12 +159,11 @@ func (r *Router) Exchange(ctx context.Context, message *mDNS.Msg) (*mDNS.Msg, er
 		r.dnsLogger.DebugContext(ctx, "exchange ", formatQuestion(message.Question[0].String()))
 	}
 	var (
-		response  *mDNS.Msg
-		records   []mDNS.RR
-		cached    bool
-		isFakeIP  bool
-		transport dns.Transport
-		err       error
+		response *mDNS.Msg
+		records  []mDNS.RR
+		cached   bool
+		isFakeIP bool
+		err      error
 	)
 	if response, records = r.dnsClient.SearchCNAMEHosts(ctx, message); response != nil {
 		return response, nil
@@ -198,10 +203,28 @@ func (r *Router) Exchange(ctx context.Context, message *mDNS.Msg) (*mDNS.Msg, er
 	if response = r.dnsClient.SearchIPHosts(ctx, message, r.defaultDomainStrategy); response != nil {
 		return response, nil
 	}
-	if response, cached = r.dnsClient.ExchangeCache(ctx, message); cached {
+	var needUpdate bool
+	if response, cached, needUpdate = r.dnsClient.ExchangeCache(ctx, message); cached {
+		if needUpdate {
+			go r.exchangeFunc(createUpdateCacheContext(ctx), message, true)
+		}
 		return response, nil
 	}
-	var metadata *adapter.InboundContext
+	response, isFakeIP, err = r.exchangeFunc(ctx, message, false)
+	return response, err
+}
+
+func (r *Router) exchangeFunc(ctx context.Context, message *mDNS.Msg, isCacheUpdate bool) (*mDNS.Msg, bool, error) {
+	if isCacheUpdate && len(message.Question) > 0 {
+		r.dnsLogger.DebugContext(ctx, "update ", formatQuestion(message.Question[0].String()), " exchange cache")
+	}
+	var (
+		response  *mDNS.Msg
+		transport dns.Transport
+		metadata  *adapter.InboundContext
+		isFakeIP  bool
+		err       error
+	)
 	ctx, metadata = adapter.ExtendContext(ctx)
 	metadata.Destination = M.Socksaddr{}
 	if len(message.Question) > 0 {
@@ -230,7 +253,7 @@ func (r *Router) Exchange(ctx context.Context, message *mDNS.Msg) (*mDNS.Msg, er
 		dnsCtx = adapter.OverrideContext(dnsCtx)
 		if rule != nil && rule.WithAddressLimit() {
 			addressLimit = true
-			response, err = r.dnsClient.ExchangeWithResponseCheck(dnsCtx, transport, message, strategy, func(response *mDNS.Msg) bool {
+			response, err = r.dnsClient.ExchangeWithResponseCheck(dnsCtx, transport, message, strategy, isCacheUpdate, func(response *mDNS.Msg) bool {
 				addresses, addrErr := dns.MessageToAddresses(response)
 				if addrErr != nil {
 					return false
@@ -240,7 +263,7 @@ func (r *Router) Exchange(ctx context.Context, message *mDNS.Msg) (*mDNS.Msg, er
 			})
 		} else {
 			addressLimit = false
-			response, err = r.dnsClient.Exchange(dnsCtx, transport, message, strategy)
+			response, err = r.dnsClient.Exchange(dnsCtx, transport, message, strategy, isCacheUpdate)
 		}
 		var rejected bool
 		if err != nil {
@@ -288,7 +311,7 @@ func (r *Router) Exchange(ctx context.Context, message *mDNS.Msg) (*mDNS.Msg, er
 		if transport == nil {
 			continue
 		}
-		response, err = r.dnsClient.Exchange(dnsCtx, transport, message, strategy)
+		response, err = r.dnsClient.Exchange(dnsCtx, transport, message, strategy, isCacheUpdate)
 		if isFakeIP {
 			break
 		}
@@ -306,9 +329,9 @@ func (r *Router) Exchange(ctx context.Context, message *mDNS.Msg) (*mDNS.Msg, er
 		break
 	}
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
-	return response, nil
+	return response, isFakeIP, nil
 }
 
 func (r *Router) Lookup(ctx context.Context, domain string, strategy dns.DomainStrategy) ([]netip.Addr, error) {
@@ -324,16 +347,21 @@ func (r *Router) LookupDefault(ctx context.Context, domain string) ([]netip.Addr
 }
 
 func (r *Router) lookup(ctx context.Context, domain string, strategy dns.DomainStrategy) ([]netip.Addr, error) {
-	var (
-		responseAddrs []netip.Addr
-		cached        bool
-		err           error
-	)
-	responseAddrs, cached = r.dnsClient.LookupCache(ctx, domain, strategy)
-	if cached {
+	if responseAddrs, cached, needUpdate := r.dnsClient.LookupCache(ctx, domain, strategy); cached {
+		if needUpdate {
+			go r.lookupFunc(createUpdateCacheContext(ctx), domain, strategy, true)
+		}
 		return responseAddrs, nil
 	}
-	r.dnsLogger.DebugContext(ctx, "lookup domain ", domain)
+	return r.lookupFunc(ctx, domain, strategy, false)
+}
+
+func (r *Router) lookupFunc(ctx context.Context, domain string, strategy dns.DomainStrategy, isCacheUpdate bool) ([]netip.Addr, error) {
+	if !isCacheUpdate {
+		r.dnsLogger.DebugContext(ctx, "lookup domain ", domain)
+	} else {
+		r.dnsLogger.DebugContext(ctx, "update domain ", domain, " lookup cache")
+	}
 	ctx, metadata := adapter.ExtendContext(ctx)
 	metadata.Destination = M.Socksaddr{}
 	metadata.Domain = domain
@@ -342,6 +370,8 @@ func (r *Router) lookup(ctx context.Context, domain string, strategy dns.DomainS
 		transportStrategy dns.DomainStrategy
 		rule              adapter.DNSRule
 		ruleIndex         int
+		responseAddrs     []netip.Addr
+		err               error
 	)
 	ruleIndex = -1
 	for {
@@ -357,13 +387,13 @@ func (r *Router) lookup(ctx context.Context, domain string, strategy dns.DomainS
 		}
 		if rule != nil && rule.WithAddressLimit() {
 			addressLimit = true
-			responseAddrs, err = r.dnsClient.LookupWithResponseCheck(dnsCtx, transport, domain, strategy, func(responseAddrs []netip.Addr) bool {
+			responseAddrs, err = r.dnsClient.LookupWithResponseCheck(dnsCtx, transport, domain, strategy, isCacheUpdate, func(responseAddrs []netip.Addr) bool {
 				metadata.DestinationAddresses = responseAddrs
 				return rule.MatchAddressLimit(metadata)
 			})
 		} else {
 			addressLimit = false
-			responseAddrs, err = r.dnsClient.Lookup(dnsCtx, transport, domain, strategy)
+			responseAddrs, err = r.dnsClient.Lookup(dnsCtx, transport, domain, strategy, isCacheUpdate)
 		}
 		lookupErr = err
 		var rejected bool
@@ -411,7 +441,7 @@ func (r *Router) lookup(ctx context.Context, domain string, strategy dns.DomainS
 		if transport == nil {
 			continue
 		}
-		responseAddrs, err = r.dnsClient.Lookup(dnsCtx, transport, domain, strategy)
+		responseAddrs, err = r.dnsClient.Lookup(dnsCtx, transport, domain, strategy, isCacheUpdate)
 		if err != nil {
 			r.dnsLogger.ErrorContext(ctx, E.Cause(err, "lookup failed for ", domain))
 		} else if len(responseAddrs) == 0 {
