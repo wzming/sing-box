@@ -72,6 +72,7 @@ type Router struct {
 	geositeReader                      *geosite.Reader
 	geositeCache                       map[string]adapter.Rule
 	needFindProcess                    bool
+	stopFindProcess                    bool
 	dnsClient                          *dns.Client
 	defaultDomainStrategy              dns.DomainStrategy
 	dnsRules                           []adapter.DNSRule
@@ -135,7 +136,8 @@ func NewRouter(
 		geoIPOptions:          common.PtrValueOrDefault(options.GeoIP),
 		geositeOptions:        common.PtrValueOrDefault(options.Geosite),
 		geositeCache:          make(map[string]adapter.Rule),
-		needFindProcess:       hasRule(options.Rules, isProcessRule) || hasDNSRule(dnsOptions.Rules, isProcessDNSRule) || options.FindProcess,
+		needFindProcess:       hasRule(options.Rules, isProcessRule) || hasDNSRule(dnsOptions.Rules, isProcessDNSRule) || (options.FindProcess != nil && *options.FindProcess),
+		stopFindProcess:       options.FindProcess != nil && !*options.FindProcess,
 		defaultDetour:         options.Final,
 		defaultDomainStrategy: dns.DomainStrategy(dnsOptions.Strategy),
 		interfaceFinder:       control.NewDefaultInterfaceFinder(),
@@ -642,7 +644,7 @@ func (r *Router) Start() error {
 	r.dnsClient.Start()
 	monitor.Finish()
 
-	if C.IsAndroid && r.platformInterface == nil {
+	if !r.stopFindProcess && r.needFindProcess && C.IsAndroid && r.platformInterface == nil {
 		monitor.Start("initialize package manager")
 		packageManager, err := tun.NewPackageManager(tun.PackageManagerOptions{
 			Callback: r,
@@ -657,7 +659,8 @@ func (r *Router) Start() error {
 			err = packageManager.Start()
 			monitor.Finish()
 			if err != nil {
-				return E.Cause(err, "start package manager")
+				r.logger.ErrorContext(r.ctx, E.Cause(err, "start package manager"))
+				packageManager = nil
 			}
 		}
 		r.packageManager = packageManager
@@ -812,19 +815,20 @@ func (r *Router) PostStart() error {
 			needWIFIState = true
 		}
 	}
-	if C.IsAndroid && r.platformInterface == nil && !r.needPackageManager {
+	if !r.stopFindProcess && C.IsAndroid && r.platformInterface == nil && !r.needPackageManager {
 		if needFindProcess {
 			monitor.Start("start package manager")
 			err := r.packageManager.Start()
 			monitor.Finish()
 			if err != nil {
-				return E.Cause(err, "start package manager")
+				r.packageManager = nil
+				r.logger.ErrorContext(r.ctx, E.Cause(err, "start package manager"))
 			}
 		} else {
 			r.packageManager = nil
 		}
 	}
-	if needFindProcess {
+	if !r.stopFindProcess && needFindProcess {
 		if r.platformInterface != nil {
 			r.processSearcher = r.platformInterface
 		} else {
